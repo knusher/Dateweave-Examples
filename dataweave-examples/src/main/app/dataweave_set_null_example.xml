@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd">
+ 
+    
+    <file:connector name="IncomingFile" readFromDirectory="C:\incoming\prorize" autoDelete="true" streaming="true" validateConnections="true" doc:name="File" outputPattern="*.csv"/>
+
+<flow name="dataweaveSetNullExampleFlow" processingStrategy="synchronous">
+        <file:inbound-endpoint path="C:\incoming\prorize" moveToDirectory="C:\incoming\prorize\archive" connector-ref="IncomingFile" fileAge="5000" responseTimeout="10000" metadata:id="7f0b31e1-3503-417f-add4-6378764947b2" doc:name="IncomingFile" doc:description="#[message.inboundProperties['originalFilename']]   rawtohex(i_fileName)">
+            <file:filename-wildcard-filter pattern="*.csv"/>
+        </file:inbound-endpoint>
+        <logger message="Paylod before the transformer #[payload]" level="INFO" doc:name="Logger - Before the call to the dataweave subflow"/>
+        <flow-ref name="dataweave_set_null_example_sub_flow_transform" doc:name="dataweave_set_null_example_sub_flow_transform"/>
+        <logger level="INFO" doc:name="Logger1" message="payload after the transform #[payload]"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+        	<set-variable variableName="emailDetails" value="&quot;An exception occured in the Prorize Rate Load: BatchId =  #[flowVars.BatchId] - CurrentRecord = #[flowVars.CurrentRecord]&quot;" doc:name="Set Details"/>
+            <logger message="Payload #[payload], exception = #[exception.exceptions]" level="ERROR" doc:name="Logger"/>
+        </catch-exception-strategy>
+
+    </flow>
+    <sub-flow name="dataweave_set_null_example_sub_flow_transform">
+        <logger message="Paylod before the transformer #[payload]" level="INFO" doc:name="Copy_of_Logger"/>
+        <dw:transform-message metadata:id="448b56f1-760c-433b-a1fb-90bc05f0e8fd" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/csv"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	Id:($.Id as :number when $.Id != "" otherwise null),
+	Name: $.Name,
+	EffectiveDate: (
+	$.EffectiveDate as :date {format: "M/d/yyyy"} as :string {format: "yyyy-MM-dd"}
+		when ($.EffectiveDate != "" )
+			otherwise null)
+}
+
+
+
+
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="payload after the transform #[payload]" level="INFO" doc:name="Copy_of_Logger1"/>
+    </sub-flow>
+
+
+</mule>
+   
